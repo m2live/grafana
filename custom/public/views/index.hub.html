@@ -7,7 +7,7 @@
     [[ end ]]
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=1024, initial-scale=1, shrink-to-fit=no" />
     <meta name="theme-color" content="#000" />
 
     <title>[[.AppTitle]]</title>
@@ -267,22 +267,123 @@
     </style>
     <!-- 3. Grafana topnav breadcrumbs: 마지막 항목만 노출 로직 끝 -->
 
-    <!-- 4. Grafana dashboard grid: 최소 너비 설정 로직 시작 -->
-    <style id="dashboard-grid-minw">
-      #pageContent *:has(> .react-grid-layout) {
-        min-width: 1024px !important;
-        overflow-x: auto !important;   /* 수평 스크롤은 여기서 */
+    <!-- 4. Grafana dashboard grid: 최소 너비 설정, main-view 폭 제한 로직 시작 -->
+    <style id="dashboard-fixed-layout-css">
+      /* HTML, Body 레벨에서 스크롤이 막히는 것을 방지 */
+      html, body {
+        overflow-x: auto !important;
+        overflow-y: auto !important;
       }
-      
+
+      /* 주요 뷰 컨테이너 스크롤 허용 */
+      .main-view, .scroll-canvas {
+        overflow-x: auto !important;
+        overflow-y: auto !important;
+        height: auto !important;
+      }
+
+      /* 대시보드 래퍼들이 1024px 밑으로 줄어들지 않도록 강제 */
+      .main-view,
+      .dashboard-container,
       .react-grid-layout {
-        width: auto !important;
         min-width: 1024px !important;
-        max-width: none !important;
+        max-width: 1700px !important;
+        width: 100% !important;
+      }
+
+      .react-grid-layout {
         position: relative !important;
-        flex: 0 0 auto !important;
+        min-height: 500px;
       }
     </style>
-    <!-- 4. Grafana dashboard grid: 최소 너비 설정 로직 끝 -->
+    <script>
+      (function enforceDesktopLayout() {
+        function enforceStyles() {
+          // 데스크탑 브라우저 창이 1024px보다 작을 때만 동작
+          if (window.innerWidth >= 1024) return;
+
+          const layout = document.querySelector('.react-grid-layout');
+          const items = document.querySelectorAll('.react-grid-item');
+          
+          let maxBottom = 0; // 패널들 중 가장 아래쪽 좌표를 찾기 위한 변수
+
+          items.forEach(item => {
+            // 1. 강제 위치 고정 (Grafana가 relative로 바꾸는 것 방지)
+            item.style.setProperty('position', 'absolute', 'important');
+            item.style.setProperty('margin', '0', 'important');
+
+            // 2. 너비(Width) 보호
+            const currentWidth = item.style.width;
+            if (currentWidth && !currentWidth.includes('!important')) {
+              item.style.setProperty('width', currentWidth, 'important');
+            }
+            
+            // 3. 좌표(Transform) 보호
+            const currentTransform = item.style.transform;
+            if (currentTransform && !currentTransform.includes('!important')) {
+              item.style.setProperty('transform', currentTransform, 'important');
+            }
+
+            // 4. (보조) Top/Left 보호
+            const currentLeft = item.style.left;
+            if (currentLeft && !currentLeft.includes('!important')) {
+              item.style.setProperty('left', currentLeft, 'important');
+            }
+            const currentTop = item.style.top;
+            if (currentTop && !currentTop.includes('!important')) {
+              item.style.setProperty('top', currentTop, 'important');
+            }
+
+            // 5. 높이 계산
+            // translate(x, y) 에서 y값을 추출 + height를 더해서 바닥 좌표 계산
+            let topVal = 0;
+            let heightVal = 0;
+
+            // Y 좌표 추출 (transform 우선)
+            if (currentTransform) {
+              // translate(10px, 200px) 또는 translate3d(10px, 200px, 0) 형태 파싱
+              const match = currentTransform.match(/,\s*(\d+)px/);
+              if (match) topVal = parseInt(match[1], 10);
+            } else if (currentTop) {
+              topVal = parseInt(currentTop, 10);
+            }
+
+            // 높이 추출
+            const hStyle = item.style.height;
+            if (hStyle) {
+               heightVal = parseInt(hStyle, 10);
+            }
+
+            // 최대 높이 갱신
+            if (!isNaN(topVal) && !isNaN(heightVal)) {
+              const bottom = topVal + heightVal;
+              if (bottom > maxBottom) {
+                maxBottom = bottom;
+              }
+            }
+          });
+
+          // 6. 부모 컨테이너 높이 강제 주입
+          // 패널들이 absolute라 부모 높이가 0이 되므로, 계산된 최하단 좌표를 부모 높이로 지정
+          if (layout && maxBottom > 0) {
+            // 여유분 100px 정도 추가
+            layout.style.setProperty('height', (maxBottom + 50) + 'px', 'important');
+          }
+        }
+
+        // DOM 변경 및 리사이즈 감지
+        const observer = new MutationObserver(() => requestAnimationFrame(enforceStyles));
+        const target = document.getElementById('reactRoot') || document.body;
+        observer.observe(target, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'class']
+        });
+        window.addEventListener('resize', enforceStyles);
+      })();
+    </script>
+    <!-- 4. Grafana dashboard grid: 최소 너비 설정, main-view 폭 제한 로직 끝 -->
 
     <!-- 12. 메가메뉴 조직 선택 셀렉트박스 SVG 아이콘 숨김 로직 시작 -->
     <style id="hide-org-select-prefix-icon">
@@ -809,7 +910,7 @@
           bannerVisible = false;
         }
       })();
-    </script>      
+    </script>
     <!-- 8. 그라파나 세션 만료 시 강제 로그아웃 처리 시작 -->
 
     <!-- 9. Bookmark 버튼 조건부 제거 로직 시작 -->
