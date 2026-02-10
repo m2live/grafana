@@ -3,6 +3,9 @@
 # to maintain formatting of multiline commands in vscode, add the following to settings.json:
 # "docker.languageserver.formatter.ignoreMultilineInstructions": true
 
+# Target platform for all stages (override at build time if needed: docker build --build-arg TARGET_PLATFORM=linux/arm64)
+ARG TARGET_PLATFORM=linux/amd64
+
 ARG BASE_IMAGE=alpine-base
 ARG GO_IMAGE=go-builder-base
 ARG JS_IMAGE=js-builder-base
@@ -14,13 +17,13 @@ ARG JS_SRC=js-builder
 
 # Dependabot cannot update dependencies listed in ARGs
 # By using FROM instructions we can delegate dependency updates to dependabot
-FROM alpine:3.23.3 AS alpine-base
-FROM ubuntu:22.04 AS ubuntu-base
-FROM golang:1.25.6-alpine AS go-builder-base
-FROM --platform=${JS_PLATFORM} node:22-alpine AS js-builder-base
+FROM --platform=${TARGET_PLATFORM} alpine:3.23.3 AS alpine-base
+FROM --platform=${TARGET_PLATFORM} ubuntu:22.04 AS ubuntu-base
+FROM --platform=${TARGET_PLATFORM} golang:1.25.6-alpine AS go-builder-base
+FROM --platform=${TARGET_PLATFORM} node:22-alpine AS js-builder-base
 
 # Javascript build stage
-FROM --platform=${JS_PLATFORM} ${JS_IMAGE} AS js-builder
+FROM --platform=${TARGET_PLATFORM} ${JS_IMAGE} AS js-builder
 
 ENV NODE_OPTIONS=--max_old_space_size=8000
 
@@ -36,7 +39,9 @@ COPY e2e e2e
 
 RUN apk add --no-cache make build-base python3
 
-RUN yarn install --immutable
+# Use BuildKit cache mount for .yarn/cache to avoid ENOSPC during install (cache not in container overlay)
+RUN --mount=type=cache,target=/tmp/grafana/.yarn/cache \
+    yarn install --immutable
 
 COPY tsconfig.json eslint.config.js .editorconfig .browserslistrc .prettierrc.js ./
 COPY scripts scripts
@@ -46,7 +51,7 @@ ENV NODE_ENV=production
 RUN yarn build
 
 # Golang build stage
-FROM ${GO_IMAGE} AS go-builder
+FROM --platform=${TARGET_PLATFORM} ${GO_IMAGE} AS go-builder
 
 ARG COMMIT_SHA=""
 ARG BUILD_BRANCH=""
@@ -71,7 +76,6 @@ COPY .citools .citools
 
 # Include vendored dependencies
 COPY pkg/util/xorm pkg/util/xorm
-COPY pkg/apis/folder pkg/apis/folder
 COPY pkg/apis/secret pkg/apis/secret
 COPY pkg/apiserver pkg/apiserver
 COPY pkg/apimachinery pkg/apimachinery
@@ -117,7 +121,7 @@ ENV BUILD_BRANCH=${BUILD_BRANCH}
 RUN make build-go GO_BUILD_TAGS=${GO_BUILD_TAGS} WIRE_TAGS=${WIRE_TAGS}
 
 # From-tarball build stage
-FROM ${BASE_IMAGE} AS tgz-builder
+FROM --platform=${TARGET_PLATFORM} ${BASE_IMAGE} AS tgz-builder
 
 WORKDIR /tmp/grafana
 
@@ -133,7 +137,7 @@ FROM ${GO_SRC} AS go-src
 FROM ${JS_SRC} AS js-src
 
 # Final stage
-FROM ${BASE_IMAGE}
+FROM --platform=${TARGET_PLATFORM} ${BASE_IMAGE}
 
 LABEL maintainer="Grafana Labs <hello@grafana.com>"
 LABEL org.opencontainers.image.source="https://github.com/grafana/grafana"
