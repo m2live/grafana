@@ -26,6 +26,7 @@ FROM --platform=${TARGET_PLATFORM} node:22-alpine AS js-builder-base
 FROM --platform=${TARGET_PLATFORM} ${JS_IMAGE} AS js-builder
 
 ENV NODE_OPTIONS=--max_old_space_size=8000
+ENV CYPRESS_INSTALL_BINARY=0
 
 WORKDIR /tmp/grafana
 
