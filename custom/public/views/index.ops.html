@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="[[.User.Language]]">
+  <head>
+    [[ if and .CSPEnabled .IsDevelopmentEnv ]]
+    <!-- Cypress overwrites CSP headers in HTTP requests, so this is required for e2e tests-->
+    <meta  http-equiv="Content-Security-Policy" content="[[.CSPContent]]"/>
+    [[ end ]]
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="theme-color" content="#000" />
+
+    <title>[[.AppTitle]]</title>
+
+    <base href="[[.AppSubUrl]]/" />
+
+    <link rel="icon" type="image/png" href="[[.FavIcon]]" />
+    <link rel="apple-touch-icon" sizes="180x180" href="[[.AppleTouchIcon]]" />
+    <link rel="mask-icon" href="[[.Assets.ContentDeliveryURL]]public/img/grafana_mask_icon.svg" color="#F05A28" />
+
+    [[range $asset := .Assets.CSSFiles]]
+      <link rel="stylesheet" href="[[$asset.FilePath]]" />
+    [[end]]
+
+    <!-- If theme is "system", we inject the stylesheets with javascript further down the page -->
+    [[ if eq .ThemeType "light" ]]
+    <link rel="stylesheet" href="[[.Assets.Light]]" />
+    [[ else if eq .ThemeType "dark" ]]
+    <link rel="stylesheet" href="[[.Assets.Dark]]" />
+    [[ end ]]
+
+    <script nonce="[[.Nonce]]">
+      performance.mark('frontend_boot_css_time_seconds');
+    </script>
+
+    <!-- 1. 첫 로그인 시 계정 초기화 로직 시작 -->
+    <!-- <script>
+        window.addEventListener("DOMContentLoaded", function() {
+          var boot = window.grafanaBootData;
+          if(boot && /grafana_session/.test(document.cookie) && !sessionStorage.getItem('m2live_signin')) {
+            sessionStorage.setItem('m2live_signin', 1);
+
+            var isFirstLogin = boot.user.orgId == 1;
+            var errMessage = isFirstLogin ? '처음 로그인하셨군요. 귀하의 계정 초기화에 실패했습니다. 관리자에게 문의하세요.' : null;
+            fetch('/api/plugin-proxy/winesoft-ops-app/api/v1/accounts/signin', {method:'POST'}).then(function(response) {
+              if(response.status == 200) {
+                isFirstLogin && response.json().then(function(result) {
+                  // redirect URL이 있으면 그것을 사용, 없으면 기존 로직 사용
+                  // 운영자는 ops로 리다이렉트 한다.
+                  if(result.redirect) {
+                    window.location.href = result.redirect;
+                  } else if(result.orgId) {
+                    location.href = '/?orgId=' + result.orgId;
+                  }
+                });
+              }
+              else {
+                errMessage && alert(errMessage);
+              }
+            }).catch(function(err) {
+              errMessage && alert(errMessage);
+            });
+          }
+        });
+    </script> -->
+    <!-- 1. 첫 로그인 시 계정 초기화 로직 끝 -->
+
+    <!-- 2. 메가메뉴 좌상단 `Grafana` 로고명 대치 로직 시작 -->
+    <!-- <script>
+      // 메가메뉴 좌상단 `Grafana` 로고명 대치
+      window.addEventListener("DOMContentLoaded", () => {
+        const body = document.body;
+        if (body) {
+          const observer = new MutationObserver(() => {
+            const xpath = "//*[normalize-space(text())='Grafana']";
+            const el = document.evaluate(xpath, body, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            if (el && !el.m2live) {
+                el.m2live = true;
+              el.innerText = "M2live Cloud";
+            }
+          });
+          observer.observe(body, { childList: true, subtree: true });
+        }
+      });
+    </script> -->
+    <!-- 2. 메가메뉴 좌상단 `Grafana` 로고명 대치 로직 끝 -->
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="msapplication-TileColor" content="#2b5797" />
+    <meta name="msapplication-config" content="public/img/browserconfig.xml" />
+  </head>
+
+  <body class="theme-[[ .ThemeType ]] [[.AppNameBodyClass]]">
+    <style>
+      .preloader {
+        height: 100%;
+        flex-direction: column;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 32px;
+      }
+
+      .preloader__enter {
+        opacity: 0;
+        animation-name: preloader-fade-in;
+        animation-iteration-count: 1;
+        animation-duration: 0.9s;
+        animation-delay: 0.5s;
+        animation-fill-mode: forwards;
+      }
+
+      .preloader__bounce {
+        text-align: center;
+        animation-name: preloader-bounce;
+        animation-duration: 0.9s;
+        animation-iteration-count: infinite;
+      }
+
+      .preloader__logo {
+        display: inline-block;
+        animation-name: preloader-squash;
+        animation-duration: 0.9s;
+        animation-iteration-count: infinite;
+        width: 60px;
+        height: 60px;
+        background-repeat: no-repeat;
+        background-size: contain;
+        background-image: url('[[.LoadingLogo]]');
+      }
+
+      .preloader__text {
+        margin-top: 16px;
+        font-weight: 500;
+        font-size: 14px;
+        font-family: Sans-serif;
+        opacity: 0;
+        animation-name: preloader-fade-in;
+        animation-duration: 0.9s;
+        animation-delay: 0.5s;
+        animation-fill-mode: forwards;
+      }
+
+      .theme-light .preloader__text {
+        color: #52545c;
+      }
+
+      .theme-dark .preloader__text {
+        color: #d8d9da;
+      }
+
+      @keyframes preloader-fade-in {
+        0% {
+          opacity: 0;
+          /*animation-timing-function: linear;*/
+          animation-timing-function: cubic-bezier(0, 0, 0.5, 1);
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      @keyframes preloader-bounce {
+        from,
+        to {
+          transform: translateY(0px);
+          animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1);
+        }
+        50% {
+          transform: translateY(-50px);
+          animation-timing-function: cubic-bezier(0.9, 0, 0.7, 1);
+        }
+      }
+
+      @keyframes preloader-squash {
+        0% {
+          transform: scaleX(1.3) scaleY(0.8);
+          animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1);
+        }
+        15% {
+          transform: scaleX(0.75) scaleY(1.25);
+          animation-timing-function: cubic-bezier(0, 0, 0.7, 0.75);
+        }
+        55% {
+          transform: scaleX(1.05) scaleY(0.95);
+          animation-timing-function: cubic-bezier(0.9, 0, 1, 1);
+        }
+        95% {
+          transform: scaleX(0.75) scaleY(1.25);
+          animation-timing-function: cubic-bezier(0, 0, 0, 1);
+        }
+        100% {
+          transform: scaleX(1.3) scaleY(0.8);
+          animation-timing-function: cubic-bezier(0, 0, 0.7, 1);
+        }
+      }
+
+      /* Fail info */
+      .preloader__text--fail {
+        display: none;
+      }
+
+      /* stop logo animation */
+      .preloader--done .preloader__bounce,
+      .preloader--done .preloader__logo {
+        animation-name: none;
+        display: none;
+      }
+
+      .preloader--done .preloader__logo,
+      .preloader--done .preloader__text {
+        display: none;
+        color: #ff5705 !important;
+        font-size: 15px;
+      }
+
+      .theme-light .preloader--done .preloader__text {
+        color: #52545c !important;
+      }
+
+      .preloader--done .preloader__text--fail {
+        display: block;
+      }
+
+      .preloader--done .preloader__text--fail a {
+        color: white;
+      }
+
+      .theme-light .preloader--done .preloader__text--fail a {
+        color: rgb(31, 98, 224);
+      }
+
+      .preloader--done code {
+        white-space: nowrap;
+        padding: 2px 5px;
+        margin: 0px 2px;
+        font-size: 0.8rem;
+        background-color: rgb(24, 27, 31);
+        color: rgb(204, 204, 220);
+        border: 1px solid rgba(204, 204, 220, 0.2);
+        border-radius: 4px;
+      }
+
+      .preloader__error-list li {
+        margin-bottom: 8px;
+      }
+
+      [ng\:cloak],
+      [ng-cloak],
+      .ng-cloak {
+        display: none !important;
+      }
+    </style>
+
+    <!-- 3. Grafana topnav breadcrumbs: 마지막 항목만 노출 로직 시작 -->
+    <style id="collapse-breadcrumb-to-last">
+      /* Grafana topnav breadcrumbs: 마지막 항목만 노출 */
+      /* NavTree에서 일부 삭제시 브래드크럼에서 `Page Not Found` 문자열 노출되는 문제가 있어 마지막 요소만 표현토록 함. */
+      nav[aria-label="Breadcrumbs"] ol > li:not(:last-child),
+      nav[aria-label="Breadcrumbs"] ul > li:not(:last-child),
+      nav[aria-label="Breadcrumbs"] li[role="separator"],
+      [data-testid="breadcrumbs"] li:not(:last-child) {
+        display: none !important;
+      }
+    </style>
+    <!-- 3. Grafana topnav breadcrumbs: 마지막 항목만 노출 로직 끝 -->
+
+    <!-- 4. Grafana dashboard grid: 최소 너비 설정 로직 시작 -->
+    <style id="dashboard-grid-minw">
+      #pageContent *:has(> .react-grid-layout) {
+        min-width: 1024px !important;
+        overflow-x: auto !important;   /* 수평 스크롤은 여기서 */
+      }
+      
+      .react-grid-layout {
+        width: auto !important;
+        min-width: 1024px !important;
+        max-width: none !important;
+        position: relative !important;
+        flex: 0 0 auto !important;
+      }
+    </style>
+    <!-- 4. Grafana dashboard grid: 최소 너비 설정 로직 끝 -->
+
+    <!-- 12. 메가메뉴 조직 선택 셀렉트박스 SVG 아이콘 숨김 로직 시작 -->
+    <style id="hide-org-select-prefix-icon">
+      /* 조직 선택 셀렉트박스의 prefix 아이콘(건물 SVG) 숨김 */
+      [class*="-input-prefix"]:has(svg) {
+        display: none !important;
+      }
+    </style>
+    <!-- 12. 메가메뉴 조직 선택 셀렉트박스 SVG 아이콘 숨김 로직 끝 -->
+
+    <!-- 13. 개인 프로필 페이지 불필요 요소 숨김 로직 시작 -->
+    <style id="hide-profile-elements">
+      /* 홈 대시보드 설정 숨김 */
+      [data-testid="User preferences home dashboard drop down"] {
+        display: none !important;
+      }
+      /* 조직 섹션 숨김 */
+      [data-testid="data-testid-user-orgs-table"] {
+        display: none !important;
+      }
+      [data-testid="data-testid-user-orgs-table"]:closest(div) {
+        display: none !important;
+      }
+      /* 조직 섹션 전체 (h3 + table 포함) 숨김 */
+      .page-sub-heading:has(+ div [data-testid="data-testid-user-orgs-table"]),
+      div:has(> .page-sub-heading):has([data-testid="data-testid-user-orgs-table"]) {
+        display: none !important;
+      }
+    </style>
+    <!-- 13. 개인 프로필 페이지 불필요 요소 숨김 로직 끝 -->
+
+    <!-- 14. 대시보드 즐겨찾기/내보내기/공유 버튼 숨김 로직 시작 -->
+    <style id="hide-dashboard-toolbar-buttons">
+      /* 즐겨찾기 버튼 숨김 */
+      [data-testid="data-testid Mark as favorite"] {
+        display: none !important;
+      }
+      /* 내보내기 버튼 숨김 */
+      [data-testid="data-testid new export button"] {
+        display: none !important;
+      }
+      /* 공유 버튼 숨김 */
+      [data-testid="data-testid new share button"] {
+        display: none !important;
+      }
+    </style>
+    <!-- 14. 대시보드 즐겨찾기/내보내기/공유 버튼 숨김 로직 끝 -->
+
+    <!-- 15. 상단바 도움말 버튼 숨김 로직 시작 -->
+    <style id="hide-help-button">
+      /* 상단바 도움말(Help) 버튼 숨김 */
+      button[aria-label="Help"] {
+        display: none !important;
+      }
+    </style>
+    <!-- 15. 상단바 도움말 버튼 숨김 로직 끝 -->
+
+    <!-- 19. 메가메뉴 북마크 버튼(pin-icon) 숨김 로직 시작 -->
+    <style id="hide-bookmark-buttons">
+      /* 북마크 버튼(pin-icon) 숨김 */
+      button.pin-icon {
+        display: none !important;
+      }
+    </style>
+    <!-- 19. 메가메뉴 북마크 버튼(pin-icon) 숨김 로직 끝 -->
+
+    <!-- 18. 대시보드 컨테이너 스크롤 제거 로직 시작 -->
+    <style id="hide-dashboard-scroll">
+      /* 대시보드 영역 스크롤 숨김 - react-grid-layout을 포함하는 부모 요소 */
+      div:has(> .react-grid-layout) {
+        overflow: hidden !important;
+      }
+    </style>
+    <!-- 18. 대시보드 컨테이너 스크롤 제거 로직 끝 -->
+
+    <!-- 16. 페이지 타이틀 및 Grafana 문자열을 M2live로 변경 로직 시작 -->
+    <script>
+      (function rebrandGrafanaToM2live() {
+        function cleanTitle() {
+          // ' - Grafana' 제거
+          if (document.title.includes(' - Grafana')) {
+            document.title = document.title.replace(' - Grafana', '');
+          }
+          // 타이틀이 정확히 'Grafana'인 경우 M2live로 변경
+          if (document.title === 'Grafana') {
+            document.title = 'M2live';
+          }
+        }
+        // 초기 실행
+        cleanTitle();
+        // React 라우팅으로 타이틀이 변경될 때마다 처리
+        var titleObserver = new MutationObserver(cleanTitle);
+        var titleEl = document.querySelector('title');
+        if (titleEl) {
+          titleObserver.observe(titleEl, { childList: true });
+        }
+      })();
+    </script>
+    <!-- 16. 페이지 타이틀 및 Grafana 문자열을 M2live로 변경 로직 끝 -->
+
+    <!-- 20. 상위 메뉴 링크 스타일 적용 로직 시작 -->
+    <style id="dashboard-menu-focus">
+      /* 상위 메뉴(url: #)는 클릭해도 이동하지 않으므로 링크 스타일(포인터·밑줄·색 변경) 제거 */
+      [data-testid="data-testid Nav menu item"] a[href="#"],
+      a[href="#"][data-testid="data-testid Nav menu item"] {
+        cursor: default !important;
+        text-decoration: none !important;
+        border-bottom: none !important;
+      }
+      [data-testid="data-testid Nav menu item"] a[href="#"]:hover *,
+      [data-testid="data-testid Nav menu item"] a[href="#"]:focus *,
+      [data-testid="data-testid Nav menu item"] a[href="#"]:active *,
+      a[href="#"][data-testid="data-testid Nav menu item"]:hover *,
+      a[href="#"][data-testid="data-testid Nav menu item"]:focus *,
+      a[href="#"][data-testid="data-testid Nav menu item"]:active * {
+        text-decoration: none !important;
+        border-bottom: none !important;
+        color: rgb(36, 41, 46, 0.75) !important;
+      }
+    </style>
+    <!-- 20. 상위 메뉴 링크 스타일 적용 로직 끝 -->
+
+    <div class="preloader">
+      <div class="preloader__enter">
+        <div class="preloader__bounce">
+          <div class="preloader__logo" aria-live="polite" role="status" aria-label="Loading M2live"></div>
+        </div>
+      </div>
+      <div class="preloader__text preloader__text--fail">
+        <main>
+          <h1>If you're seeing this M2live has failed to load its application files</h1>
+          <ol class="preloader__error-list">
+            <li>This could be caused by your reverse proxy settings.</li>
+            <li>If you host grafana under a subpath make sure your <code>grafana.ini</code> <code>root_url</code> setting
+              includes subpath. If not using a reverse proxy make sure to set <code>serve_from_sub_path</code> to true.</li>
+            <li>If you have a local dev build make sure you build frontend using: <code>yarn start</code>, or
+              <code>yarn build</code>.</li>
+            <li>Sometimes restarting <code>grafana-server</code> can help.</li>
+            <li>Check if you are using a non-supported browser. For more information, refer to the list of
+              <a href="https://grafana.com/docs/grafana/latest/installation/requirements/#supported-web-browsers">
+                supported browsers </a
+              >.</li>
+          </ol>
+        </main>
+      </div>
+      <script nonce="[[.Nonce]]">
+        // Check to see if browser is not supported by Grafana
+        // Source file in app/core/utils/browser.ts & tests make edits there and copy compiled typescript here
+        function checkBrowserCompatibility() {
+          var isIE = navigator.userAgent.indexOf('MSIE') > -1;
+          var isEdge = navigator.userAgent.indexOf('Edge/') > -1 || navigator.userAgent.indexOf('Edg/') > -1;
+          var isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+          var isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+
+          /* Check for
+          <= IE11 (Trident 7)
+          Edge <= 16
+          Firefox <= 64
+          Chrome <= 54
+          */
+          var isEdgeVersion = /Edge\/([0-9.]+)/.exec(navigator.userAgent);
+
+          if (isIE && parseFloat(/Trident\/([0-9.]+)/.exec(navigator.userAgent)[1]) <= 7) {
+            return false;
+          } else if (
+            isEdge &&
+            ((isEdgeVersion && parseFloat(isEdgeVersion[1]) <= 16) ||
+              parseFloat(/Edg\/([0-9.]+)/.exec(navigator.userAgent)[1]) <= 16)
+          ) {
+            return false;
+          } else if (isFirefox && parseFloat(/Firefox\/([0-9.]+)/.exec(navigator.userAgent)[1]) <= 64) {
+            return false;
+          } else if (isChrome && parseFloat(/Chrome\/([0-9.]+)/.exec(navigator.userAgent)[1]) <= 54) {
+            return false;
+          }
+
+          return true;
+        }
+
+        if (!checkBrowserCompatibility()) {
+          alert('Your browser is not fully supported, please try newer version.');
+        }
+      </script>
+    </div>
+
+    <div id="reactRoot"></div>
+
+    <script nonce="[[.Nonce]]">
+      window.grafanaBootData = {
+        user: [[.User]],
+        settings: [[.Settings]],
+        /** 5. Grafana 메가메뉴 구조 변경 로직 시작 */
+        navTree: (function(){ var nav = [[.NavTree]];
+          (function(){
+            // 메가메뉴가 10개 이상이 되면 포커스가 동작하지 않는 문제가 있음
+            var starredIndex = nav.findIndex(function(e){ return e && e.id === "starred"; });
+            if (starredIndex > -1) { nav.splice(starredIndex, 1); }
+            var bookmarksIndex = nav.findIndex(function(e){ return e && e.id === "bookmarks"; });
+            if (bookmarksIndex > -1) { nav.splice(bookmarksIndex, 1); }
+            var drilldownIndex = nav.findIndex(function(e){ return e && e.id === "drilldown"; });
+            if (drilldownIndex > -1) { nav.splice(drilldownIndex, 1); }
+            var moreAppsIndex = nav.findIndex(function(e){ return e && e.id === "apps"; }); // TODO: 대시보드 메뉴 제거 및 서비스 통계 메뉴 추가 - 대시보드 조직 URL, 쿼리스트링 때문에 골때림
+            if (moreAppsIndex > -1) { nav.splice(moreAppsIndex, 1); }
+            nav.push({
+              id: "ops-mgmt",
+              text: "운영 관리",
+              url: "#",
+              icon: "bolt",
+              children: [
+                { id: "customer-mgmt", text: "고객 관리", url: "/a/winesoft-ops-app/customers", keywords: ["customer", "customers", "고객", "고객관리", "운영 관리"] },
+                { id: "domain-mgmt", text: "도메인 관리", url: "/a/winesoft-ops-app/vhosts", keywords: ["domain", "vhost", "도메인", "도메인관리", "운영 관리"] },
+                { id: "account-mgmt", text: "운영자 관리", url: "/a/winesoft-ops-app/accounts", keywords: ["account", "operator", "운영자", "운영자관리", "계정", "운영 관리"] },
+                { id: "plan-mgmt", text: "과금 플랜 관리", url: "/a/winesoft-ops-app/plans", keywords: ["plan", "billing", "과금", "플랜", "요금", "운영 관리"] },
+                { id: "audit-logs", text: "감사 로그", url: "/a/winesoft-ops-app/audit-logs", keywords: ["audit", "log", "감사", "로그", "감사로그", "운영 관리"] },
+              ]
+            });
+          })();
+          return nav; })(),
+        /** 5. Grafana 메가메뉴 구조 변경 로직 끝 */
+        assets: [[.Assets]]
+      };
+
+      /** 6. Grafana 메가메뉴 확장 상태 유지 로직 시작 */
+      // localstorage에 아래 key:value 추가 해당 메뉴 확장 상태 유지
+      localStorage.setItem('grafana.navigation.expanded[운영 관리]', true);
+      // 나머지는 닫은채로 고정
+      localStorage.setItem('grafana.navigation.expanded[북마크]', false);
+      localStorage.setItem('grafana.navigation.expanded[Bookmarks]', false);
+      localStorage.setItem('grafana.navigation.expanded[연결]', false);
+      localStorage.setItem('grafana.navigation.expanded[Connections]', false);
+      localStorage.setItem('grafana.navigation.expanded[관리]', false);
+      localStorage.setItem('grafana.navigation.expanded[Administration]', false);
+      /** 6. Grafana 메가메뉴 확장 상태 유지 로직 끝 */
+
+
+      // Set theme to match system only on startup.
+      // Do not react to changes in system theme after startup.
+      if (window.grafanaBootData.user.theme === "system") {
+        document.body.classList.remove("theme-system");
+        var darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        var cssLink = document.createElement("link");
+        cssLink.rel = 'stylesheet';
+
+        if (darkQuery.matches) {
+          document.body.classList.add("theme-dark");
+          cssLink.href = window.grafanaBootData.assets.dark;
+          window.grafanaBootData.user.lightTheme = false;
+        } else {
+          document.body.classList.add("theme-light");
+          cssLink.href = window.grafanaBootData.assets.light;
+          window.grafanaBootData.user.lightTheme = true;
+        }
+        document.head.appendChild(cssLink);
+      }
+
+      window.__grafana_load_failed = function() {
+        var preloader = document.getElementsByClassName("preloader");
+        if (preloader.length) {
+          preloader[0].className = "preloader preloader--done";
+        }
+      }
+
+      // In case the js files fails to load the code below will show an info message.
+      window.onload = function() {
+        if (window.__grafana_app_bundle_loaded) {
+          return;
+        }
+        window.__grafana_load_failed();
+      };
+
+      [[if .Assets.ContentDeliveryURL]]
+        window.public_cdn_path = '[[.Assets.ContentDeliveryURL]]public/build/';
+      [[end]]
+      [[if .Nonce]]
+        window.nonce = '[[.Nonce]]';
+      [[end]]
+    </script>
+
+    <!-- 7. Grafana 로그인 페이지에서 oauth_state 만료시 리디렉션 로직 시작 -->
+    <script>
+      (() => {
+        const path = location.pathname || '';
+        const params = new URLSearchParams(location.search);
+        const retried = params.has('_r');
+        const hasOAuth = params.has('code') || params.has('state') || params.has('error');
+        const hasCookie = document.cookie.includes('oauth_state');
+      
+        if (path.startsWith('/login') && !hasOAuth && !hasCookie) {
+          if (!retried) {
+            location.replace('/login?_r=1'); // 1회만 재시도
+          } else {
+            console.warn('oauth_state 없음. 재시도 중단');
+          }
+        }
+      })();
+    </script>
+    <!-- 7. Grafana 로그인 페이지에서 oauth_state 만료시 리디렉션 로직 끝 -->
+
+    <!-- 8. 그라파나 세션 만료 시 강제 로그아웃 처리 시작 -->
+    <script>
+      (() => {
+        const IDLE_LIMIT_MS = 60 * 60 * 1000; // 1시간 만료
+        const LOGOUT_COUNTDOWN_SEC = 5;
+      
+        let lastActivity = Date.now();
+        let countdownTimer = null;
+        let checkTimer = null;
+        let bannerVisible = false;
+        let lastEvtTs = 0;
+      
+        // 스로틀된 활동 마킹
+        function markActivityThrottled() {
+          const now = Date.now();
+          if (bannerVisible) return;           // 배너 노출 중엔 입력 무시
+          if (now - lastEvtTs < 200) return;   // 200ms 스로틀
+          lastEvtTs = now;
+          lastActivity = now;
+        }
+      
+        // 입력 이벤트 등록
+        ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'].forEach(e =>
+          window.addEventListener(e, markActivityThrottled, { passive: true })
+        );
+      
+        // 주기 검사
+        function startIdleCheck(intervalMs = 1000) {
+          if (checkTimer) clearInterval(checkTimer);
+          checkTimer = setInterval(() => {
+            const now = Date.now();
+            if (!bannerVisible && now - lastActivity > IDLE_LIMIT_MS) {
+              showCountdownAndLogout(LOGOUT_COUNTDOWN_SEC);
+            }
+          }, intervalMs);
+        }
+        startIdleCheck(60000); // 60초 마다 검사
+      
+        function showCountdownAndLogout(seconds) {
+          bannerVisible = true;
+      
+          let banner = document.getElementById('forced-session-expire-banner');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'forced-session-expire-banner';
+            Object.assign(banner.style, {
+              position: 'fixed',
+              top: '32px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              minWidth: '340px',
+              background: 'rgba(0,0,0,0.65)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              color: '#fff',
+              padding: '16px 20px',
+              borderRadius: '10px',
+              fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif',
+              fontSize: '14px',
+              boxShadow: '0 16px 32px rgba(0,0,0,0.4)',
+              zIndex: 999999,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.15)',
+            });
+      
+            const title = document.createElement('div');
+            title.textContent = '무활동으로 세션이 종료됩니다.';
+            title.style.fontWeight = '600';
+            title.style.marginBottom = '8px';
+      
+            const countdownWrap = document.createElement('div');
+            countdownWrap.style.color = '#ffd966';
+            countdownWrap.style.marginBottom = '12px';
+      
+            const label = document.createElement('span');
+            label.textContent = '자동 로그아웃까지 ';
+            const counterSpan = document.createElement('span');
+            counterSpan.id = 'forced-session-expire-countdown';
+            const secLabel = document.createElement('span');
+            secLabel.textContent = '초';
+            countdownWrap.append(label, counterSpan, secLabel);
+      
+            const btn = document.createElement('button');
+            btn.textContent = '계속 사용하기';
+            Object.assign(btn.style, {
+              background: '#3898ff', color: '#fff', border: 'none',
+              borderRadius: '6px', padding: '6px 14px', fontSize: '13px', cursor: 'pointer',
+            });
+            btn.addEventListener('click', keepUsing);
+      
+            banner.append(title, countdownWrap, btn);
+            document.body.appendChild(banner);
+          }
+      
+          let remain = seconds;
+          const ctr = document.getElementById('forced-session-expire-countdown');
+          ctr.textContent = String(remain);
+      
+          if (countdownTimer) clearInterval(countdownTimer);
+          countdownTimer = setInterval(() => {
+            remain -= 1;
+            ctr.textContent = String(remain);
+            if (remain <= 0) {
+              clearInterval(countdownTimer);
+              location.href = '/logout';
+            }
+          }, 1000);
+        }
+      
+        function keepUsing() {
+          // 연장: 마지막 활동 갱신 + 배너 닫기
+          lastActivity = Date.now();
+          removeBanner();
+        }
+      
+        function removeBanner() {
+          if (countdownTimer) {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+          }
+          const banner = document.getElementById('forced-session-expire-banner');
+          if (banner) banner.remove();
+          bannerVisible = false;
+        }
+      })();
+    </script>      
+    <!-- 8. 그라파나 세션 만료 시 강제 로그아웃 처리 시작 -->
+
+    <!-- 9. Bookmark 버튼 조건부 제거 로직 시작 -->
+    <script nonce="[[.Nonce]]">
+      (function removePinForServiceStat() {
+        // 실제 제거 로직
+        function stripPin() {
+          // 사이드바 항목 컨테이너들을 모두 순회
+          // Grafana 12 기준으로 nav item 하나가 div(예: css-1ofpb08 같은 동적 class) 안에
+          // <a> ... <span>텍스트</span> ... </a>
+          // <button class="pin-icon">...</button>
+          // 이런 식으로 구성된다.
+          var items = document.querySelectorAll('div[class^="css-"]');
+    
+          items.forEach(function (item) {
+            // a 안의 span 텍스트로 "서비스 통계"인지 판별
+            var labelSpan = item.querySelector('a span');
+            if (!labelSpan) return;
+    
+            if (['운영 관리'].includes(labelSpan.textContent.trim())) {
+              // 이 nav item 바로 아래에 있는 pin 버튼만 제거
+              // (children 메뉴의 pin 은 그대로 둠)
+              var pinBtn = item.querySelector('button.pin-icon');
+              if (pinBtn) {
+                pinBtn.remove();
+              }
+            }
+          });
+        }
+    
+        // 최초 1회 시도
+        stripPin();
+    
+        // React 리렌더 대비. 메뉴가 다시 그려질 때마다 stripPin 재실행
+        var sidebarRoot = document.body;
+        var mo = new MutationObserver(function () {
+          stripPin();
+        });
+        mo.observe(sidebarRoot, { childList: true, subtree: true });
+      })();
+    </script>
+    <!-- 9. Bookmark 버튼 조건부 제거 로직 끝 -->
+
+    <!-- 21. 검색 다이얼로그(kbar) 커스터마이징 로직 시작 -->
+    <style id="m2live-search-results">
+      /* 커스텀 검색 결과 스타일 */
+      .m2live-search-results {
+        padding: 8px 0;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .m2live-search-result-item {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        cursor: pointer;
+        color: inherit;
+        text-decoration: none;
+        border-radius: 4px;
+        margin: 2px 8px;
+      }
+      .m2live-search-result-item:hover,
+      .m2live-search-result-item.selected {
+        background: rgba(204, 204, 220, 0.12);
+      }
+      .m2live-search-result-text {
+        font-size: 14px;
+      }
+      /* "찾은 결과 없음" alert 숨기기 (커스텀 결과가 있을 때) */
+      [role="dialog"]:has(.m2live-search-results) [role="alert"] {
+        display: none !important;
+      }
+      /* 검색 다이얼로그에서 href="#"인 최상위 메뉴 숨기기 */
+      [role="dialog"] [role="listbox"] a[href="#"][role="option"],
+      [role="dialog"] [role="listbox"] [role="option"]:has(a[href="#"]) {
+        display: none !important;
+      }
+    </style>
+    <script>
+      (function customizeCommandPalette() {
+        // 검색에서 숨길 최상위 메뉴 텍스트
+        const HIDE_FROM_SEARCH = ['운영 관리'];
+
+        // 한글 검색 키워드 매핑 (URL -> {text, keywords})
+        const MENU_ITEMS = {
+          '/': {
+            text: '홈',
+            keywords: ['홈', '홈페이지', '메인', 'home', 'main']
+          },
+          '/a/winesoft-ops-app/customers': {
+            text: '고객 관리',
+            keywords: ['customer', 'customers', '고객', '고객관리', '운영관리', '운영 관리']
+          },
+          '/a/winesoft-ops-app/vhosts': {
+            text: '도메인 관리',
+            keywords: ['domain', 'vhost', '도메인', '도메인관리', '운영관리', '운영 관리']
+          },
+          '/a/winesoft-ops-app/accounts': {
+            text: '운영자 관리',
+            keywords: ['account', 'operator', '운영자', '운영자관리', '계정', '운영관리', '운영 관리']
+          },
+          '/a/winesoft-ops-app/plans': {
+            text: '과금 플랜 관리',
+            keywords: ['plan', 'billing', '과금', '플랜', '요금', '과금플랜', '운영관리', '운영 관리']
+          },
+          '/a/winesoft-ops-app/audit-logs': {
+            text: '감사 로그',
+            keywords: ['audit', 'log', '감사', '로그', '감사로그', '운영관리', '운영 관리']
+          },
+        };
+
+        // 한글 포함 여부 체크
+        function hasKorean(str) {
+          return /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(str);
+        }
+
+        // 키워드로 매칭되는 메뉴 찾기
+        function findMatchingMenus(searchValue) {
+          const matches = [];
+          const search = searchValue.toLowerCase();
+
+          for (const [url, item] of Object.entries(MENU_ITEMS)) {
+            const textMatch = item.text.toLowerCase().includes(search);
+            const keywordMatch = item.keywords.some(kw =>
+              kw.toLowerCase().includes(search) || search.includes(kw.toLowerCase())
+            );
+
+            if (textMatch || keywordMatch) {
+              matches.push({ url, text: item.text });
+            }
+          }
+          return matches;
+        }
+
+        let selectedIndex = 0;
+        let isUpdating = false; // 무한루프 방지 플래그
+        let isComposing = false; // 한글 IME 입력 중 플래그
+
+        // 커스텀 검색 결과 표시
+        function showCustomResults(dialog, matches) {
+          if (isUpdating) return;
+          isUpdating = true;
+
+          try {
+            // 이미 주입된 결과 컨테이너 확인
+            let container = dialog.querySelector('.m2live-search-results');
+
+            if (matches.length === 0) {
+              if (container) container.remove();
+              return;
+            }
+
+            // 결과를 표시할 영역 찾기
+            const contentArea = dialog.querySelector('[class*="css-4"]');
+            if (!contentArea) return;
+
+            // 컨테이너가 없으면 생성
+            if (!container) {
+              container = document.createElement('div');
+              container.className = 'm2live-search-results';
+              container.setAttribute('role', 'listbox');
+              container.id = 'kbar-listbox-custom';
+              contentArea.insertBefore(container, contentArea.firstChild);
+            }
+
+            // 현재 결과와 동일한지 확인 (불필요한 업데이트 방지)
+            const currentUrls = Array.from(container.querySelectorAll('a')).map(a => a.href);
+            const newUrls = matches.map(m => window.location.origin + m.url);
+            if (currentUrls.length === newUrls.length && currentUrls.every((url, i) => url === newUrls[i])) {
+              return;
+            }
+
+            // 기존 결과 제거
+            container.innerHTML = '';
+            selectedIndex = 0;
+
+            // 새 결과 추가
+            matches.forEach((match, idx) => {
+              const item = document.createElement('a');
+              item.href = match.url;
+              item.className = 'm2live-search-result-item' + (idx === 0 ? ' selected' : '');
+              item.setAttribute('role', 'option');
+              item.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
+              item.setAttribute('data-index', idx);
+              item.innerHTML = `<span class="m2live-search-result-text">${match.text}</span>`;
+
+              item.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = match.url;
+              });
+
+              item.addEventListener('mouseenter', () => {
+                container.querySelectorAll('.m2live-search-result-item').forEach((el, i) => {
+                  el.classList.toggle('selected', i === idx);
+                  el.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+                });
+                selectedIndex = idx;
+              });
+
+              container.appendChild(item);
+            });
+          } finally {
+            isUpdating = false;
+          }
+        }
+
+        // listbox가 있을 때 최상위 메뉴 숨기기
+        function hideTopLevelMenus(listbox) {
+          if (isUpdating) return;
+
+          const options = listbox.querySelectorAll('[role="option"]');
+          options.forEach(option => {
+            if (option.dataset.m2liveProcessed) return;
+            option.dataset.m2liveProcessed = 'true';
+
+            const span = option.querySelector('span');
+            const menuText = span ? span.textContent.trim() : '';
+
+            if (HIDE_FROM_SEARCH.includes(menuText)) {
+              const link = option.tagName === 'A' ? option : option.querySelector('a');
+              if (link && (link.getAttribute('href') === '#' || !link.getAttribute('href'))) {
+                option.style.display = 'none';
+              }
+            }
+          });
+        }
+
+        let lastSearchValue = '';
+        let debounceTimer = null;
+
+        function patchCommandPalette() {
+          if (isUpdating) return;
+
+          const dialog = document.querySelector('[role="dialog"]');
+          if (!dialog) return;
+
+          const input = dialog.querySelector('input[role="combobox"]');
+          const searchValue = input ? input.value.trim() : '';
+
+          // 검색어가 변경되지 않았으면 스킵
+          if (searchValue === lastSearchValue) return;
+          lastSearchValue = searchValue;
+
+          const listbox = dialog.querySelector('[role="listbox"]:not(.m2live-search-results)');
+
+          // listbox가 있으면 최상위 메뉴 숨기기
+          if (listbox) {
+            hideTopLevelMenus(listbox);
+          }
+
+          // 한글 검색 처리
+          if (searchValue && hasKorean(searchValue)) {
+            const matches = findMatchingMenus(searchValue);
+            showCustomResults(dialog, matches);
+          } else {
+            // 한글이 아니면 커스텀 결과 제거
+            const container = dialog.querySelector('.m2live-search-results');
+            if (container) {
+              isUpdating = true;
+              container.remove();
+              isUpdating = false;
+            }
+          }
+        }
+
+        // 키보드 네비게이션 처리
+        document.addEventListener('keydown', e => {
+          // 한글 IME 입력 중이면 무시 (isComposing 또는 keyCode 229)
+          if (isComposing || e.isComposing || e.keyCode === 229) return;
+
+          const dialog = document.querySelector('[role="dialog"]');
+          if (!dialog) return;
+
+          const container = dialog.querySelector('.m2live-search-results');
+          if (!container) return;
+
+          const items = container.querySelectorAll('.m2live-search-result-item');
+          if (items.length === 0) return;
+
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectedIndex = Math.max(selectedIndex - 1, 0);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            const selectedItem = items[selectedIndex];
+            if (selectedItem) {
+              window.location.href = selectedItem.href;
+            }
+            return;
+          } else {
+            return;
+          }
+
+          items.forEach((item, idx) => {
+            item.classList.toggle('selected', idx === selectedIndex);
+            item.setAttribute('aria-selected', idx === selectedIndex ? 'true' : 'false');
+          });
+        }, true);
+
+        // MutationObserver - 다이얼로그 열림/닫힘만 감지
+        const observer = new MutationObserver(mutations => {
+          // 커스텀 결과 관련 변경은 무시
+          if (isUpdating) return;
+
+          for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+              if (node.nodeType === 1 && (node.getAttribute('role') === 'dialog' || node.querySelector?.('[role="dialog"]'))) {
+                // 다이얼로그가 열렸을 때만 처리
+                lastSearchValue = ''; // 리셋
+                setTimeout(patchCommandPalette, 100);
+                return;
+              }
+            }
+          }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: false });
+
+        // 한글 IME 조합 시작/종료 감지
+        document.addEventListener('compositionstart', e => {
+          if (e.target && e.target.getAttribute('role') === 'combobox') {
+            isComposing = true;
+          }
+        }, true);
+
+        document.addEventListener('compositionend', e => {
+          if (e.target && e.target.getAttribute('role') === 'combobox') {
+            isComposing = false;
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(patchCommandPalette, 50);
+          }
+        }, true);
+
+        // 입력 이벤트 감지 - 한글 조합 중에도 검색은 동작해야 함
+        document.addEventListener('input', e => {
+          if (e.target && e.target.getAttribute('role') === 'combobox') {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(patchCommandPalette, 100);
+          }
+        }, true);
+      })();
+    </script>
+    <!-- 21. 검색 다이얼로그(kbar) 커스터마이징 로직 끝 -->
+
+    <!-- 10. 불필요한 메뉴 숨김 및 비밀번호 변경 시도시 키클락 콘솔로 이동 로직 시작 -->
+    <script nonce="[[.Nonce]]">
+      (function () {
+        const KC_PASSWORD_URL =
+          'https://auth.m2live.io/realms/m2live/account/account-security/signing-in';
+    
+        // 숨길 규칙: href 기준
+        const HIDE_HREF_PREFIXES = [
+          '/profile/notifications', // 알림 이력
+        ];
+    
+        // 숨길 규칙: 라벨 텍스트 기준
+        const HIDE_TEXT_EXACT = [
+          'Enable kiosk mode',
+          '블로그 최근 글',
+        ];
+    
+        function isUserMenu(node) {
+          return node && node.nodeType === 1 && node.getAttribute('role') === 'menu';
+        }
+    
+        function hideMenuItem(el) {
+          const item = el.closest('[role="menuitem"]') || el;
+          if (item && item.style) item.style.display = 'none';
+        }
+    
+        function patchMenu(menuEl) {
+          // 1) 비밀번호 변경 href 교체 및 텍스트 변경
+          const pw = menuEl.querySelector('a[href^="/profile/password"]');
+          if (pw) {
+            pw.setAttribute('href', KC_PASSWORD_URL);
+            // SPA 라우팅을 완전히 우회하려면 target은 _self 유지
+            pw.setAttribute('target', '_self');
+            
+            // 메뉴 텍스트 변경: 한글/영문 자동 감지
+            const currentText = (pw.textContent || '').trim();
+            const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(currentText);
+            const newText = hasKorean ? '계정 보안' : 'Account Security';
+            
+            // span 요소 찾아서 텍스트만 변경 (SVG 등 다른 요소 유지)
+            const spanEl = pw.querySelector('span');
+            if (spanEl) {
+              spanEl.textContent = newText;
+            } else {
+              // span이 없으면 textContent로 직접 변경 (폴백)
+              pw.textContent = newText;
+            }
+          }
+    
+          // 2) href 기반 숨김
+          const links = menuEl.querySelectorAll('a[href]');
+          links.forEach((a) => {
+            const href = a.getAttribute('href') || '';
+            if (HIDE_HREF_PREFIXES.some((p) => href === p || href.startsWith(p + '/'))) {
+              hideMenuItem(a);
+            }
+          });
+    
+          // 3) 텍스트 기반 숨김(보조)
+          const items = menuEl.querySelectorAll('[role="menuitem"]');
+          items.forEach((it) => {
+            const text = (it.textContent || '').trim();
+            if (HIDE_TEXT_EXACT.includes(text)) {
+              hideMenuItem(it);
+            }
+          });
+        }
+    
+        // 메뉴가 DOM에 등장할 때만 패치
+        const mo = new MutationObserver((mutations) => {
+          for (const m of mutations) {
+            for (const n of m.addedNodes) {
+              if (isUserMenu(n)) {
+                patchMenu(n);
+              } else if (n && n.querySelectorAll) {
+                // 추가된 노드 하위에 menu가 포함된 경우
+                const menus = n.querySelectorAll('[role="menu"]');
+                menus.forEach(patchMenu);
+              }
+            }
+          }
+        });
+    
+        mo.observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
+    <!-- 10. 불필요한 메뉴 숨김 및 비밀번호 변경 시도시 키클락 콘솔로 이동 로직 끝 -->
+
+    [[if .GoogleTagManagerId]]
+    <!-- Google Tag Manager -->
+    <script nonce="[[.Nonce]]">
+      dataLayer = [
+        {
+          IsSignedIn: '[[.User.IsSignedIn]]',
+          Email: '[[.User.Email]]',
+          Name: '[[.User.Name]]',
+          UserId: '[[.User.Id]]',
+          OrgId: '[[.User.OrgId]]',
+          OrgName: '[[.User.OrgName]]',
+        },
+      ];
+    </script>
+    <noscript>
+      <iframe
+        src="//www.googletagmanager.com/ns.html?id=[[.GoogleTagManagerId]]"
+        height="0"
+        width="0"
+        style="display: none; visibility: hidden"
+      ></iframe>
+    </noscript>
+    <script nonce="[[.Nonce]]">
+      (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var f = d.getElementsByTagName(s)[0],
+          j = d.createElement(s),
+          dl = l != 'dataLayer' ? '&l=' + l : '';
+        j.async = true;
+        j.src = '//www.googletagmanager.com/gtm.js?id=' + i + dl;
+        f.parentNode.insertBefore(j, f);
+      })(window, document, 'script', 'dataLayer', '[[.GoogleTagManagerId]]');
+    </script>
+    <!-- End Google Tag Manager -->
+    [[end]]
+
+    [[if .Settings.FeatureToggles.assetSriChecks ]]
+      [[range $asset := .Assets.JSFiles]]
+        <script
+        nonce="[[$.Nonce]]"
+        src="[[$asset.FilePath]]"
+        integrity="[[$asset.Integrity]]"
+        crossorigin="anonymous"
+        type="text/javascript"
+        defer
+      ></script>
+      [[end]]
+    [[else]]
+      [[range $asset := .Assets.JSFiles]]
+        <script
+        nonce="[[$.Nonce]]"
+        src="[[$asset.FilePath]]"
+        type="text/javascript"
+        defer
+      ></script>
+      [[end]]
+    [[end]]
+
+    <script nonce="[[.Nonce]]">
+      performance.mark('frontend_boot_js_done_time_seconds');
+    </script>
+  </body>
+</html>
