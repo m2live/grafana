@@ -221,10 +221,8 @@ COPY --from=go-src /tmp/grafana/bin/grafana* /tmp/grafana/bin/*/grafana* ./bin/
 COPY --from=js-src /tmp/grafana/public ./public
 COPY --from=js-src /tmp/grafana/LICENSE ./
 
-# M2live customization overlay: docker build --build-arg FLAVOR=hub|ops
-ARG FLAVOR=hub
 COPY custom/public/img/ ./public/img/
-COPY custom/public/views/index.${FLAVOR}.html ./public/views/index.html
+COPY custom/public/views/index.html ./public/views/index.html
 
 EXPOSE 3000
 
