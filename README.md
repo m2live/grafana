@@ -7,6 +7,13 @@ The open-source platform for monitoring and observability
 [![Drone](https://drone.grafana.net/api/badges/grafana/grafana/status.svg)](https://drone.grafana.net/grafana/grafana)
 [![Go Report Card](https://goreportcard.com/badge/github.com/grafana/grafana)](https://goreportcard.com/report/github.com/grafana/grafana)
 
+> **레포지토리 안내 / About this repository**  
+> 이 레포는 M2live Cloud 서비스를 위한 Grafana **fork** 레포입니다.  
+> 변경 사항은 [MODIFICATIONS.md](MODIFICATIONS.md)를 참고해주세요.  
+>  
+> This repository is a **fork** of Grafana for M2live Cloud service.  
+> See [MODIFICATIONS.md](MODIFICATIONS.md) for modification details.  
+
 Grafana allows you to query, visualize, alert on and understand your metrics no matter where they are stored. Create, explore, and share dashboards with your team and foster a data-driven culture:
 
 - **Visualizations:** Fast and flexible client side graphs with a multitude of options. Panel plugins offer many different ways to visualize metrics and logs.
