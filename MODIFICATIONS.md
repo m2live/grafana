@@ -81,6 +81,9 @@ The following customizations were added to the Grafana main HTML template for th
 - Fetches popup-type announcements from plugin API on home page entry
 - Displays stacked modal popups with priority ordering and "hide for today" support
 
+**Footer**
+- Page bottom footer added: copyright © 2026 WINESOFT Inc., link to license (GitHub).
+
 ### `public/img/apple-touch-icon.png`
 - Replaced Grafana apple-touch-icon with M2live brand icon
 
@@ -174,6 +177,9 @@ M2live Cloud 서비스를 위해 Grafana 메인 HTML 템플릿에 다음 커스�
 **홈 페이지 팝업 공지**
 - 홈 진입 시 플러그인 API에서 팝업 유형 공지사항 조회
 - 우선순위 기반 격자식 겹침 모달 팝업 노출, "오늘하루 안보기" 기능 지원
+
+**푸터**
+- 페이지 하단에 푸터 추가: 저작권 © 2026 WINESOFT Inc., 라이선스 링크(GitHub).
 
 ### `public/img/apple-touch-icon.png`
 - Grafana 기본 apple-touch-icon을 M2live 브랜드 아이콘으로 교체

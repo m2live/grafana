@@ -269,17 +269,34 @@
 
     <!-- 4. Grafana dashboard grid: 최소 너비 설정, main-view 폭 제한 로직 시작 -->
     <style id="dashboard-fixed-layout-css">
-      /* HTML, Body 레벨에서 스크롤이 막히는 것을 방지 */
-      html, body {
-        overflow-x: auto !important;
-        overflow-y: auto !important;
-      }
-
-      /* 주요 뷰 컨테이너 스크롤 허용 */
-      .main-view, .scroll-canvas {
+      /* HTML, Body 스크롤 허용 */
+      html, body, #reactRoot {
         overflow-x: auto !important;
         overflow-y: auto !important;
         height: auto !important;
+        min-height: 100vh !important;
+      }
+
+      /* Main View를 Block 요소로 강제 변경 */
+      .main-view {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+      }
+
+      /* 대시보드 내부 래퍼들(Hash Class 포함) 강제 확장
+         .main-view 하위의 모든 div가 높이를 제한하지 않도록 설정 */
+      .main-view > div,
+      .main-view main,
+      .dashboard-container,
+      .scroll-canvas,
+      .react-grid-layout {
+        height: auto !important;
+        min-height: 100% !important;
+        overflow: visible !important;
+        contain: none !important; /* 브라우저 최적화로 인한 렌더링 제한 해제 */
       }
 
       /* 대시보드 래퍼들이 1024px 밑으로 줄어들지 않도록 강제 */
@@ -307,67 +324,66 @@
           
           let maxBottom = 0; // 패널들 중 가장 아래쪽 좌표를 찾기 위한 변수
 
-          items.forEach(item => {
-            // 1. 강제 위치 고정 (Grafana가 relative로 바꾸는 것 방지)
-            item.style.setProperty('position', 'absolute', 'important');
-            item.style.setProperty('margin', '0', 'important');
+          if (items.length > 0) {
+            items.forEach(item => {
+              // 1. 강제 위치 고정
+              item.style.setProperty('position', 'absolute', 'important');
+              item.style.setProperty('margin', '0', 'important');
 
-            // 2. 너비(Width) 보호
-            const currentWidth = item.style.width;
-            if (currentWidth && !currentWidth.includes('!important')) {
-              item.style.setProperty('width', currentWidth, 'important');
-            }
-            
-            // 3. 좌표(Transform) 보호
-            const currentTransform = item.style.transform;
-            if (currentTransform && !currentTransform.includes('!important')) {
-              item.style.setProperty('transform', currentTransform, 'important');
-            }
-
-            // 4. (보조) Top/Left 보호
-            const currentLeft = item.style.left;
-            if (currentLeft && !currentLeft.includes('!important')) {
-              item.style.setProperty('left', currentLeft, 'important');
-            }
-            const currentTop = item.style.top;
-            if (currentTop && !currentTop.includes('!important')) {
-              item.style.setProperty('top', currentTop, 'important');
-            }
-
-            // 5. 높이 계산
-            // translate(x, y) 에서 y값을 추출 + height를 더해서 바닥 좌표 계산
-            let topVal = 0;
-            let heightVal = 0;
-
-            // Y 좌표 추출 (transform 우선)
-            if (currentTransform) {
-              // translate(10px, 200px) 또는 translate3d(10px, 200px, 0) 형태 파싱
-              const match = currentTransform.match(/,\s*(\d+)px/);
-              if (match) topVal = parseInt(match[1], 10);
-            } else if (currentTop) {
-              topVal = parseInt(currentTop, 10);
-            }
-
-            // 높이 추출
-            const hStyle = item.style.height;
-            if (hStyle) {
-               heightVal = parseInt(hStyle, 10);
-            }
-
-            // 최대 높이 갱신
-            if (!isNaN(topVal) && !isNaN(heightVal)) {
-              const bottom = topVal + heightVal;
-              if (bottom > maxBottom) {
-                maxBottom = bottom;
+              // 2. 너비(Width) 보호
+              const currentWidth = item.style.width;
+              if (currentWidth && !currentWidth.includes('!important')) {
+                item.style.setProperty('width', currentWidth, 'important');
               }
-            }
-          });
+              
+              // 3. 좌표 및 높이 계산
+              let topVal = 0;
+              let heightVal = 0;
+
+              // Transform에서 Y좌표 추출
+              const currentTransform = item.style.transform;
+              if (currentTransform) {
+                 // item.style.transform 유지
+                 if (!currentTransform.includes('!important')) {
+                    item.style.setProperty('transform', currentTransform, 'important');
+                 }
+                 const match = currentTransform.match(/,\s*(\d+)px/);
+                 if (match) topVal = parseInt(match[1], 10);
+              } else {
+                 // Top에서 Y좌표 추출
+                 const currentTop = item.style.top;
+                 if (currentTop) {
+                    if (!currentTop.includes('!important')) {
+                       item.style.setProperty('top', currentTop, 'important');
+                    }
+                    topVal = parseInt(currentTop, 10);
+                 }
+              }
+
+              // 높이 추출
+              const hStyle = item.style.height;
+              if (hStyle) {
+                 heightVal = parseInt(hStyle, 10);
+              }
+
+              // 최대 높이 갱신
+              if (!isNaN(topVal) && !isNaN(heightVal)) {
+                const bottom = topVal + heightVal;
+                if (bottom > maxBottom) {
+                  maxBottom = bottom;
+                }
+              }
+            });
+          }
 
           // 6. 부모 컨테이너 높이 강제 주입
-          // 패널들이 absolute라 부모 높이가 0이 되므로, 계산된 최하단 좌표를 부모 높이로 지정
-          if (layout && maxBottom > 0) {
-            // 여유분 100px 정도 추가
-            layout.style.setProperty('height', (maxBottom + 50) + 'px', 'important');
+          // .react-grid-layout이 여러 겹일 수 있으므로 모두 찾아 적용
+          const layouts = document.querySelectorAll('.react-grid-layout');
+          if (layouts.length > 0 && maxBottom > 0) {
+            const finalHeight = (maxBottom + 100) + 'px';
+            layouts.forEach(l => {
+                l.style.setProperty('height', finalHeight, 'important');
+            });
           }
         }
 
@@ -454,15 +470,6 @@
       }
     </style>
     <!-- 19. 메가메뉴 북마크 버튼(pin-icon) 숨김 로직 끝 -->
-
-    <!-- 18. 대시보드 컨테이너 스크롤 제거 로직 시작 -->
-    <style id="hide-dashboard-scroll">
-      /* 대시보드 영역 스크롤 숨김 - react-grid-layout을 포함하는 부모 요소 */
-      div:has(> .react-grid-layout) {
-        overflow: hidden !important;
-      }
-    </style>
-    <!-- 18. 대시보드 컨테이너 스크롤 제거 로직 끝 -->
 
     <!-- 16. 페이지 타이틀 및 Grafana 문자열을 M2live로 변경 로직 시작 -->
     <script>
@@ -1724,5 +1731,55 @@
     <script nonce="[[.Nonce]]">
       performance.mark('frontend_boot_js_done_time_seconds');
     </script>
+
+    <!-- Footer -->
+    <footer id="m2live-footer" style="
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-size: 12px;
+      color: rgba(204, 204, 220, 0.65);
+      background: rgba(17, 18, 23, 0.95);
+      border-top: 1px solid rgba(204, 204, 220, 0.07);
+      z-index: 1000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    ">
+      <span>&copy; 2026 WINESOFT Inc. All rights reserved.</span>
+      <span style="color: rgba(204, 204, 220, 0.3);">|</span>
+      <a href="https://github.com/m2live/grafana/tree/grafana-compliance-12.0.10" target="_blank" rel="noopener noreferrer" style="color: rgba(204, 204, 220, 0.65); text-decoration: none;">
+        License
+      </a>
+    </footer>
+    <style>
+      #m2live-footer a:hover {
+        color: rgba(204, 204, 220, 0.9);
+        text-decoration: underline;
+      }
+      .theme-light #m2live-footer {
+        color: rgba(52, 54, 60, 0.65);
+        background: rgba(244, 245, 245, 0.95);
+        border-top: 1px solid rgba(52, 54, 60, 0.1);
+      }
+      .theme-light #m2live-footer span[style*="color: rgba(204"] {
+        color: rgba(52, 54, 60, 0.3) !important;
+      }
+      .theme-light #m2live-footer a {
+        color: rgba(52, 54, 60, 0.65);
+      }
+      .theme-light #m2live-footer a:hover {
+        color: rgba(52, 54, 60, 0.9);
+      }
+      /* Footer가 있을 때 body 하단 padding 추가 */
+      body:has(#m2live-footer) {
+        padding-bottom: 32px;
+      }
+    </style>
+    <!-- Footer End -->
   </body>
 </html>
