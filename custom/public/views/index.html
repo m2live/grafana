@@ -76,7 +76,7 @@
             const el = document.evaluate(xpath, body, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
             if (el && !el.m2live) {
                 el.m2live = true;
-              el.innerText = "M2live Cloud";
+              el.innerText = "M2Live Cloud";
             }
           });   
           observer.observe(body, { childList: true, subtree: true });
@@ -94,6 +94,8 @@
 
   <body class="theme-[[ .ThemeType ]] [[.AppNameBodyClass]]">
     <style>
+      /* 루트 폰트 크기: 1rem = 13px (Grafana 기본 14px 오버라이드) */
+      html { font-size: 13px; }
       .preloader {
         height: 100%;
         flex-direction: column;
@@ -275,6 +277,7 @@
         overflow-y: auto !important;
         height: auto !important;
         min-height: 100vh !important;
+        overflow: visible !important;
       }
 
       /* Main View를 Block 요소로 강제 변경 */
@@ -452,6 +455,55 @@
       }
     </style>
     <!-- 14. 대시보드 즐겨찾기/내보내기/공유 버튼 숨김 로직 끝 -->
+
+    <!-- 23. 대시보드 패널 메뉴 버튼: 비관리자 숨김 로직 시작 -->
+    <style id="hide-panel-menu-button">
+      /* 기본적으로 패널 메뉴 버튼 숨김 (관리자일 경우 JS에서 이 스타일 제거) */
+      [data-testid="panel-menu-button"],
+      [data-testid^="data-testid Panel menu"] {
+        display: none !important;
+      }
+    </style>
+    <script>
+      (function togglePanelMenuByAdmin() {
+        var user = window.grafanaBootData && window.grafanaBootData.user;
+        if (user && user.isGrafanaAdmin) {
+          var style = document.getElementById('hide-panel-menu-button');
+          if (style) style.remove();
+        }
+      })();
+    </script>
+    <!-- 23. 대시보드 패널 메뉴 버튼: 비관리자 숨김 로직 끝 -->
+
+    <!-- 24. 빈 텍스트 패널(구분자) 호버 효과 제거 로직 시작 -->
+    <style id="empty-panel-no-hover">
+      /* 빈 텍스트 패널(구분자)로 마킹된 요소의 호버 효과 제거 */
+      .react-grid-item[data-m2live-separator="true"] {
+        pointer-events: none !important;
+      }
+      .react-grid-item[data-m2live-separator="true"] * {
+        pointer-events: none !important;
+      }
+    </style>
+    <script>
+      (function disableEmptyPanelHover() {
+        function markSeparators() {
+          var panels = document.querySelectorAll('[data-testid="data-testid panel content"]');
+          panels.forEach(function(panel) {
+            var textContent = panel.textContent.trim();
+            if (textContent === '') {
+              var gridItem = panel.closest('.react-grid-item');
+              if (gridItem && !gridItem.dataset.m2liveSeparator) {
+                gridItem.dataset.m2liveSeparator = 'true';
+              }
+            }
+          });
+        }
+        var observer = new MutationObserver(markSeparators);
+        observer.observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
+    <!-- 24. 빈 텍스트 패널(구분자) 호버 효과 제거 로직 끝 -->
 
     <!-- 15. 상단바 도움말 버튼 숨김 로직 시작 -->
     <style id="hide-help-button">
@@ -1386,6 +1438,25 @@
     </script>
     <!-- 10. 불필요한 메뉴 숨김 및 비밀번호 변경 시도시 키클락 콘솔로 이동 로직 끝 -->
 
+    <!-- 22. 테마 변경 탭 내 실험적 테마 안내 문구 숨김 로직 시작 -->
+    <script>
+      (function hideExperimentalThemeMessage() {
+        function hide() {
+          var xpath = "//text()[contains(., '실험적 테마')]";
+          var result = document.evaluate(xpath, document.body, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+          var textNode = result.singleNodeValue;
+          if (textNode && textNode.parentElement && !textNode.parentElement.dataset.m2liveHidden) {
+            textNode.parentElement.dataset.m2liveHidden = 'true';
+            textNode.parentElement.style.display = 'none';
+          }
+        }
+
+        var mo = new MutationObserver(hide);
+        mo.observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
+    <!-- 22. 테마 변경 탭 내 실험적 테마 안내 문구 숨김 로직 끝 -->
+
     <!-- 11. 새로고침시 accounts/me 1회 호출 로직 시작 -->
     <script>
       // app plugin을 거치지 않고 customer 교체를 위해 auth middleware를 1회 호출하기 위함임
@@ -1750,11 +1821,7 @@
       z-index: 1000;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     ">
-      <span>&copy; 2026 WINESOFT Inc. All rights reserved.</span>
-      <span style="color: rgba(204, 204, 220, 0.3);">|</span>
-      <a href="https://github.com/m2live/grafana/tree/grafana-compliance-12.0.10" target="_blank" rel="noopener noreferrer" style="color: rgba(204, 204, 220, 0.65); text-decoration: none;">
-        License
-      </a>
+      <span>&copy; 2026 WineSOFT Inc. All rights reserved.</span>
     </footer>
     <style>
       #m2live-footer a:hover {
